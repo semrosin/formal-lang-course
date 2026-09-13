@@ -1,9 +1,9 @@
+import pathlib
 from typing import Any
 
 import cfpq_data
 import networkx as nx
 import pydot
-import pathlib
 
 
 def get_graph_info(graph_name: str) -> tuple[int, int, set[str]]:
@@ -19,7 +19,9 @@ def save_two_cycles_graph(
     labels: tuple[str, str],
     path: str | pathlib.Path,
 ) -> nx.MultiDiGraph:
-    graph = cfpq_data.labeled_two_cycles_graph(n, m, common_node=common_node, labels=labels)
+    graph = cfpq_data.labeled_two_cycles_graph(
+        n, m, common_node=common_node, labels=labels
+    )
 
     dot_graph = pydot.Dot(graph_type="digraph")
     for node in graph.nodes:
