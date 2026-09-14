@@ -40,25 +40,28 @@ def test_get_graph_info_unknown_graph():
 def test_save_two_cycles_graph(tmp_path):
     path = tmp_path / "two_cycles_graph.dot"
 
-    graph = graph_lib.save_two_cycles_graph(3, 2, 0, ("a", "b"), path)
+    graph = graph_lib.save_two_cycles_graph(3, 2, 42, ("x", "y"), path)
 
-    expected_nodes = {0, 1, 2, 3, 4, 5}
+    expected_nodes = {1, 2, 3, 4, 5, 42}
     expected_edges = {
-        (0, 1, "a"),
-        (1, 2, "a"),
-        (2, 3, "a"),
-        (3, 0, "a"),
-        (0, 4, "b"),
-        (4, 5, "b"),
-        (5, 0, "b"),
+        (42, 1, "x"),
+        (1, 2, "x"),
+        (2, 3, "x"),
+        (3, 42, "x"),
+        (42, 4, "y"),
+        (4, 5, "y"),
+        (5, 42, "y"),
     }
 
     assert set(graph.nodes) == expected_nodes
+    assert graph.number_of_edges() == len(expected_edges)
     assert set(graph.edges(data="label")) == expected_edges
 
     (dot_graph,) = pydot.graph_from_dot_file(str(path))
 
+    assert dot_graph.get_type() == "digraph"
     assert {int(node.get_name()) for node in dot_graph.get_nodes()} == expected_nodes
+    assert len(dot_graph.get_edges()) == len(expected_edges)
     assert {
         (edge.get_source(), edge.get_destination(), edge.get_attributes()["label"])
         for edge in dot_graph.get_edges()
