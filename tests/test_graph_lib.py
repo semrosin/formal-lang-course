@@ -1,3 +1,4 @@
+import networkx as nx
 import pydot
 import pytest
 
@@ -58,9 +59,18 @@ def test_get_graph_info():
     }
 
 
-def test_get_graph_info_unknown_graph():
+@pytest.mark.parametrize("graph_name", ["no_such_graph", "", " "])
+def test_get_graph_info_unknown_graph(graph_name):
     with pytest.raises(FileNotFoundError):
-        graph_lib.get_graph_info("no_such_graph")
+        graph_lib.get_graph_info(graph_name)
+
+
+def test_get_graph_info_missing_csv(tmp_path, monkeypatch):
+    path = tmp_path / "missing.csv"
+    monkeypatch.setattr(graph_lib.cfpq_data, "download", {"local": path}.__getitem__)
+
+    with pytest.raises(FileNotFoundError):
+        graph_lib.get_graph_info("local")
 
 
 def test_save_two_cycles_graph(tmp_path):
@@ -92,3 +102,53 @@ def test_save_two_cycles_graph(tmp_path):
         (edge.get_source(), edge.get_destination(), edge.get_attributes()["label"])
         for edge in dot_graph.get_edges()
     } == {(str(u), str(v), c) for u, v, c in expected_edges}
+
+
+@pytest.mark.parametrize("n, m", [(-1, 2), (2, -1), (-1, -1)])
+def test_save_two_cycles_graph_negative_size_preserves_file(n, m, tmp_path):
+    path = tmp_path / "existing.dot"
+    original_content = b"digraph { original; }\n"
+    path.write_bytes(original_content)
+
+    with pytest.raises(nx.NetworkXError):
+        graph_lib.save_two_cycles_graph(n, m, 0, ("a", "b"), path)
+
+    assert path.read_bytes() == original_content
+
+
+@pytest.mark.parametrize("n, m", [(0, 2), (2, 0), (0, 0)])
+def test_save_two_cycles_graph_empty_cycle(n, m, tmp_path):
+    path = tmp_path / "graph.dot"
+
+    # CFPQ Data requires a node in each cycle besides the common node.
+    with pytest.raises(IndexError):
+        graph_lib.save_two_cycles_graph(n, m, 0, ("a", "b"), path)
+
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("labels", [(), ("a",)])
+def test_save_two_cycles_graph_missing_labels(labels, tmp_path):
+    path = tmp_path / "graph.dot"
+
+    with pytest.raises(IndexError):
+        graph_lib.save_two_cycles_graph(2, 3, 0, labels, path)
+
+    assert not path.exists()
+
+
+def test_save_two_cycles_graph_missing_parent(tmp_path):
+    path = tmp_path / "missing" / "graph.dot"
+
+    with pytest.raises(FileNotFoundError):
+        graph_lib.save_two_cycles_graph(2, 3, 0, ("a", "b"), path)
+
+    assert not path.parent.exists()
+
+
+def test_save_two_cycles_graph_directory_path(tmp_path):
+    with pytest.raises((IsADirectoryError, PermissionError)):
+        graph_lib.save_two_cycles_graph(2, 3, 0, ("a", "b"), tmp_path)
+
+    assert tmp_path.is_dir()
+    assert not list(tmp_path.iterdir())
