@@ -23,7 +23,7 @@ def get_graph_info(graph_name: str) -> GraphInfo:
 def save_two_cycles_graph(
     n: int,
     m: int,
-    common_node: int | Any,
+    common_node: Any,
     labels: tuple[str, str],
     path: str | pathlib.Path,
 ) -> nx.MultiDiGraph:
