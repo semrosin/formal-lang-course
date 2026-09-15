@@ -15,24 +15,24 @@ def test_get_graph_info():
     assert number_of_vertices == 129
     assert number_of_edges == 273
     assert labels == {
-            "equivalentClass",
-            "first",
-            "hasChild",
-            "hasParent",
-            "hasSex",
-            "hasSibling",
-            "hasValue",
-            "intersectionOf",
-            "inverseOf",
-            "onProperty",
-            "oneOf",
-            "range",
-            "rest",
-            "sameAs",
-            "someValuesFrom",
-            "type",
-            "versionInfo",
-        }
+        "equivalentClass",
+        "first",
+        "hasChild",
+        "hasParent",
+        "hasSex",
+        "hasSibling",
+        "hasValue",
+        "intersectionOf",
+        "inverseOf",
+        "onProperty",
+        "oneOf",
+        "range",
+        "rest",
+        "sameAs",
+        "someValuesFrom",
+        "type",
+        "versionInfo",
+    }
 
 
 def test_get_graph_info_unknown_graph():
