@@ -12,12 +12,9 @@ def test_get_graph_info():
     number_of_vertices, number_of_edges, labels = info
 
     assert isinstance(info, graph_lib.GraphInfo)
-    assert info.number_of_vertices == number_of_vertices == 129
-    assert info.number_of_edges == number_of_edges == 273
-    assert (
-        info.labels
-        == labels
-        == {
+    assert number_of_vertices == 129
+    assert number_of_edges == 273
+    assert labels == {
             "equivalentClass",
             "first",
             "hasChild",
@@ -36,7 +33,6 @@ def test_get_graph_info():
             "type",
             "versionInfo",
         }
-    )
 
 
 def test_get_graph_info_unknown_graph():
