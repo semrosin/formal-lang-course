@@ -83,14 +83,14 @@ def test_save_two_cycles_graph_negative_size_preserves_file(tmp_path):
 
 
 def test_save_two_cycles_graph_parallel_edges_round_trip(tmp_path):
-    path = str(tmp_path / "parallel_edges.dot")
+    path = tmp_path / "parallel_edges.dot"
 
     graph = graph_lib.save_two_cycles_graph(1, 1, 1, ("a", "b"), path)
     (restored,) = pydot.graph_from_dot_file(str(path))
 
     assert set(graph.nodes) == {1, 2}
     assert restored.get_type() == "digraph"
-    assert not restored.get_strict()
+    assert not path.read_text().startswith("strict")
     assert {node.get_name() for node in restored.get_nodes()} == {"1", "2"}
     expected_edges = Counter(
         {("1", "1", "a"): 2, ("1", "2", "b"): 1, ("2", "1", "b"): 1}
