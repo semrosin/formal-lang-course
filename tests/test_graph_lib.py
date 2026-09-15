@@ -4,6 +4,32 @@ import pytest
 from project import graph_lib
 
 
+@pytest.mark.parametrize(
+    "csv_data, expected",
+    [
+        pytest.param("", (0, 0, set()), id="empty-graph"),
+        pytest.param(
+            "0 1 a\n0 1 a\n0 1 b\n1 1 b\n2 0 a\n",
+            (3, 5, {"a", "b"}),
+            id="parallel-edges-and-self-loop",
+        ),
+    ],
+)
+def test_get_graph_info_named_fields(csv_data, expected, tmp_path, monkeypatch):
+    path = tmp_path / "graph.csv"
+    path.write_text(csv_data, encoding="utf-8")
+    monkeypatch.setattr(graph_lib.cfpq_data, "download", {"local": path}.__getitem__)
+
+    info = graph_lib.get_graph_info("local")
+
+    assert isinstance(info, graph_lib.GraphInfo)
+    assert info.number_of_vertices == expected[0]
+    assert info.number_of_edges == expected[1]
+    assert info.labels == expected[2]
+    number_of_vertices, number_of_edges, labels = info
+    assert (number_of_vertices, number_of_edges, labels) == expected
+
+
 def test_get_graph_info():
     number_of_vertices, number_of_edges, labels = graph_lib.get_graph_info(
         "generations"
