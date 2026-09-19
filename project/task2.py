@@ -10,6 +10,8 @@ Two conversions are provided:
 
 """
 
+from typing import Set
+
 from networkx import MultiDiGraph
 from pyformlang.finite_automaton import (
     DeterministicFiniteAutomaton,
@@ -33,8 +35,8 @@ def regex_to_dfa(regex: str) -> DeterministicFiniteAutomaton:
 
 def graph_to_nfa(
     graph: MultiDiGraph,
-    start_states: set[int] | None = None,
-    final_states: set[int] | None = None,
+    start_states: Set[int],
+    final_states: Set[int],
 ) -> NondeterministicFiniteAutomaton:
     """Build an NFA from a labeled directed multigraph."""
 
