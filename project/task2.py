@@ -27,7 +27,37 @@ LABEL_ATTRIBUTE = "label"
 
 
 def regex_to_dfa(regex: str) -> DeterministicFiniteAutomaton:
-    """Build a minimal DFA that accepts the language of ``regex``."""
+    """Build a minimal DFA that accepts the language of ``regex``.
+
+    The syntax is the one of :class:`pyformlang.regular_expression.Regex`:
+    ``|`` is union, ``*`` is the Kleene star, juxtaposition is concatenation,
+    parentheses group sub-expressions, and whitespace between the tokens is
+    ignored.
+    Symbols are arbitrary strings, so multi-character symbols such as
+    ``"a1"`` are allowed.
+
+    Args:
+        regex: A regular expression, for example ``"(a | b)*c"``.
+
+    Returns:
+        :class:`~pyformlang.finite_automaton.DeterministicFiniteAutomaton`
+        that accepts exactly the words described by ``regex``. The automaton
+        is deterministic and minimal; in particular it accepts the empty word
+        exactly when ``regex`` does.
+
+    Raises:
+        MisformedRegexError: If ``regex`` cannot be parsed. The exception is defined in
+            :mod:`pyformlang.regular_expression`.
+
+    Examples:
+        >>> dfa = regex_to_dfa("a (b | c)*")
+        >>> dfa.accepts(["a", "b", "c"])
+        True
+        >>> dfa.accepts(["a", "d"])
+        False
+        >>> dfa.is_deterministic()
+        True
+    """
 
     epsilon_nfa = Regex(regex).to_epsilon_nfa()
     return epsilon_nfa.minimize()
@@ -38,7 +68,37 @@ def graph_to_nfa(
     start_states: Set[int],
     final_states: Set[int],
 ) -> NondeterministicFiniteAutomaton:
-    """Build an NFA from a labeled directed multigraph."""
+    """Build an NFA from a labeled directed multigraph.
+
+    The graph is used as is: every node becomes an automaton state, and every
+    edge ``u --label--> v`` becomes a transition that reads the symbol
+    ``label`` and goes from ``u`` to ``v``.
+
+    Args:
+        graph: A :class:`networkx.MultiDiGraph` whose edges carry the
+            :data:`LABEL_ATTRIBUTE` (``"label"``) attribute with the input
+            symbol. Nodes can be of any hashable type, but the types used in
+            the tests are integers and strings.
+        start_states: Nodes that become the start states of the automaton. An
+            empty set means "all nodes of ``graph`` are start states".
+        final_states: Nodes that become the final states of the automaton. An
+            empty set means "all nodes of ``graph`` are final states".
+
+    Returns:
+        :class:`~pyformlang.finite_automaton.NondeterministicFiniteAutomaton`
+        whose states are the nodes of ``graph`` and whose transitions are the
+        edges of ``graph``.
+
+    Examples:
+        >>> import networkx as nx
+        >>> graph = nx.MultiDiGraph()
+        >>> _ = graph.add_edges_from([(0, 1), (1, 2)], label="a")
+        >>> nfa = graph_to_nfa(graph, {0}, {2})
+        >>> nfa.accepts(["a", "a"])
+        True
+        >>> nfa.accepts(["a"])
+        False
+    """
 
     nodes = set(graph.nodes)
 
