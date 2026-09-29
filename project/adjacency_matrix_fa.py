@@ -3,8 +3,11 @@
 from collections import defaultdict, deque
 from collections.abc import Iterable
 
-from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, Symbol
+from networkx import MultiDiGraph
+from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, State, Symbol
 from scipy.sparse import csr_matrix, kron
+
+from project.task2 import graph_to_nfa, regex_to_dfa
 
 
 class AdjacencyMatrixFA:
@@ -112,3 +115,49 @@ def intersect_automata(
         if symbol in automaton2.matrices
     }
     return product
+
+
+def tensor_based_rpq(
+    regex: str, graph: MultiDiGraph, start_nodes: set[int], final_nodes: set[int]
+) -> set[tuple[int, int]]:
+    """Find graph node pairs joined by a path accepted by ``regex``."""
+
+    graph_nodes = set(graph.nodes)
+    starts = (set(start_nodes) if start_nodes else graph_nodes) & graph_nodes
+    finals = (set(final_nodes) if final_nodes else graph_nodes) & graph_nodes
+    if not starts or not finals:
+        return set()
+
+    regex_matrix = AdjacencyMatrixFA(regex_to_dfa(regex))
+    graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, starts, finals))
+    product = intersect_automata(regex_matrix, graph_matrix)
+    width = graph_matrix.states_count
+
+    neighbors = [set() for _ in range(product.states_count)]
+    for matrix in product.matrices.values():
+        for source in range(product.states_count):
+            neighbors[source].update(
+                int(target)
+                for target in matrix.indices[
+                    matrix.indptr[source] : matrix.indptr[source + 1]
+                ]
+            )
+
+    result = set()
+    for start in starts:
+        graph_start = graph_matrix.state_to_index[State(start)]
+        initial = {
+            regex_start * width + graph_start  # graph_start < width
+            for regex_start in regex_matrix.start_states
+        }
+        visited = set(initial)
+        queue = deque(initial)
+        while queue:
+            state = queue.popleft()
+            if state in product.final_states:
+                final = graph_matrix.index_to_state[state % width].value
+                result.add((start, final))
+            for target in neighbors[state] - visited:
+                visited.add(target)
+                queue.append(target)
+    return result
