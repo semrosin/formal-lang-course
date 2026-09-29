@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 from collections.abc import Iterable
 
 from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, Symbol
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, kron
 
 
 class AdjacencyMatrixFA:
@@ -78,3 +78,37 @@ class AdjacencyMatrixFA:
                         visited.add(target)
                         queue.append(target)
         return True
+
+
+def intersect_automata(
+    automaton1: AdjacencyMatrixFA, automaton2: AdjacencyMatrixFA
+) -> AdjacencyMatrixFA:
+    """Build the synchronous product using a Kronecker matrix per label."""
+
+    product = object.__new__(AdjacencyMatrixFA)
+    width = automaton2.states_count
+    product.index_to_state = tuple(
+        (first, second)
+        for first in automaton1.index_to_state
+        for second in automaton2.index_to_state
+    )
+    product.state_to_index = {
+        state: index for index, state in enumerate(product.index_to_state)
+    }
+    product.states_count = automaton1.states_count * width
+    product.start_states = {
+        first * width + second  # second < width (width == max(automaton2.states))
+        for first in automaton1.start_states
+        for second in automaton2.start_states
+    }
+    product.final_states = {
+        first * width + second
+        for first in automaton1.final_states
+        for second in automaton2.final_states
+    }
+    product.matrices = {
+        symbol: kron(matrix, automaton2.matrices[symbol], format="csr")
+        for symbol, matrix in automaton1.matrices.items()
+        if symbol in automaton2.matrices
+    }
+    return product
