@@ -12,9 +12,9 @@ from rpq_concrete_cases import CASES_RPQ, CaseRPQ
 # Fix import statements in try block to run tests
 try:
     from project.adjacency_matrix_fa import tensor_based_rpq
-    from project.task4 import ms_bfs_based_rpq
+    from project.rpq import ms_bfs_based_rpq
 except ImportError:
-    pytestmark = pytest.mark.skip("Task 4 is not ready to test!")
+    pytestmark = pytest.mark.skip("RPQ solver is not ready to test!")
 
 
 @pytest.fixture(scope="class", params=range(5))
