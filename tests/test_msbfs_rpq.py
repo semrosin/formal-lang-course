@@ -2,7 +2,7 @@
 
 from networkx import MultiDiGraph
 
-from project.rpq import ms_bfs_based_rpq
+from project.msbfs_rpq import ms_bfs_based_rpq
 
 
 def test_ms_bfs_based_rpq_matches_expected_pairs() -> None:
