@@ -72,7 +72,7 @@ class AdjacencyMatrixFA:
     def transitive_closure(self) -> csr_matrix:
         """Return the reflexive-transitive closure of the adjacency matrix."""
 
-        reachable = eye(len(self.states), format="csr", dtype=bool)
+        reachable = eye(self.states_count, format="csr", dtype=bool)
         for matrix in self.matrices.values():
             reachable = reachable + matrix
         while True:
