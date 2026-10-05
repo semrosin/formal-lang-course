@@ -27,7 +27,7 @@ class AdjacencyMatrixFA:
         }
 
         edges = defaultdict(lambda: ([], []))
-        for source, symbol, target in automaton._transition_function.get_edges():
+        for source, symbol, target in automaton:
             sources, targets = edges[symbol]
             sources.append(self.state_to_index[source])
             targets.append(self.state_to_index[target])
