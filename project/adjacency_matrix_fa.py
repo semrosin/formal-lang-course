@@ -1,19 +1,36 @@
 """Sparse matrix representation of finite automata for regular path queries."""
 
-from collections import defaultdict, deque
+from collections import defaultdict
 from collections.abc import Iterable
 
+import numpy as np
 from networkx import MultiDiGraph
-from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, State, Symbol
-from scipy.sparse import csr_matrix, kron
+from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, Symbol
+from scipy.sparse import csr_matrix, identity, kron
 
 from project.task2 import graph_to_nfa, regex_to_dfa
 
 
 class AdjacencyMatrixFA:
-    """An NFA represented by one sparse adjacency matrix per symbol."""
+    """An NFA represented by one sparse adjacency matrix per symbol.
 
-    def __init__(self, automaton: NondeterministicFiniteAutomaton) -> None:
+    Args:
+        automaton: Automaton to represent. If ``None``, an empty automaton
+            is created; this is convenient when the fields are filled later.
+    """
+
+    def __init__(
+        self, automaton: NondeterministicFiniteAutomaton | None = None
+    ) -> None:
+        if automaton is None:
+            self.index_to_state = ()
+            self.state_to_index = {}
+            self.states_count = 0
+            self.start_states = set()
+            self.final_states = set()
+            self.matrices = {}
+            return
+
         self.index_to_state = tuple(automaton.states)
         self.state_to_index = {
             state: index for index, state in enumerate(self.index_to_state)
@@ -88,7 +105,7 @@ def intersect_automata(
 ) -> AdjacencyMatrixFA:
     """Build the synchronous product using a Kronecker matrix per label."""
 
-    product = object.__new__(AdjacencyMatrixFA)
+    product = AdjacencyMatrixFA()
     width = automaton2.states_count
     product.index_to_state = tuple(
         (first, second)
