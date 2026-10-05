@@ -25,29 +25,26 @@ def ms_bfs_based_rpq(
     of the symbol (enlarged to all blocks at once with ``block_diag``).
     """
 
-    graph_nodes = set(graph.nodes)
-    starts = (set(start_nodes) if start_nodes else graph_nodes) & graph_nodes
-    finals = (set(final_nodes) if final_nodes else graph_nodes) & graph_nodes
-    if not starts or not finals:
-        return set()
-
     regex_matrix = AdjacencyMatrixFA(regex_to_dfa(regex))
-    graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, starts, finals))
+    graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
 
     width = regex_matrix.states_count
-    sources = list(starts)
-    shape = (len(sources) * width, graph_matrix.states_count)
+    start_indices = sorted(graph_matrix.start_states)
+    blocks = len(start_indices)
+    if not blocks:
+        return set()
+
+    shape = (blocks * width, graph_matrix.states_count)
 
     # Frontier and visited states: one row block per start node.
     front = np.zeros(shape, dtype=bool)
-    for block, source in enumerate(sources):
-        column = graph_matrix.state_to_index[source]
+    for block, start in enumerate(start_indices):
         for dfa_start in regex_matrix.start_states:
-            front[block * width + dfa_start, column] = True
+            front[block * width + dfa_start, start] = True
     visited = front.copy()
 
     dfa_steps = {
-        symbol: block_diag([matrix.transpose()] * len(sources), format="csr")
+        symbol: block_diag([matrix.transpose()] * blocks, format="csr")
         for symbol, matrix in regex_matrix.matrices.items()
         if symbol in graph_matrix.matrices
     }
@@ -63,11 +60,16 @@ def ms_bfs_based_rpq(
 
     dfa_finals = list(regex_matrix.final_states)
     result: set[tuple[int, int]] = set()
-    for block, source in enumerate(sources):
+    for block, start in enumerate(start_indices):
         block_rows = visited[block * width : (block + 1) * width, :]
         reached = np.any(block_rows[dfa_finals, :], axis=0)
-        for final in finals:
-            if reached[graph_matrix.state_to_index[final]]:
-                result.add((source, final))
+        for final in graph_matrix.final_states:
+            if reached[final]:
+                result.add(
+                    (
+                        graph_matrix.index_to_state[start].value,
+                        graph_matrix.index_to_state[final].value,
+                    )
+                )
 
     return result
