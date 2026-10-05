@@ -6,7 +6,7 @@ from collections.abc import Iterable
 import numpy as np
 from networkx import MultiDiGraph
 from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, Symbol
-from scipy.sparse import csr_matrix, identity, kron
+from scipy.sparse import csr_matrix, eye, kron
 
 from project.task2 import graph_to_nfa, regex_to_dfa
 
@@ -61,43 +61,63 @@ class AdjacencyMatrixFA:
             for symbol, (sources, targets) in edges.items()
         }
 
-    def accepts(self, word: Iterable[Symbol]) -> bool:
-        """Check whether any path labeled by ``word`` reaches a final state."""
+    def adjacency_matrix(self) -> csr_matrix:
+        """Return the boolean union of the per-symbol matrices."""
 
-        current = self.start_states
+        adjacency = csr_matrix((self.states_count, self.states_count), dtype=bool)
+        for matrix in self.matrices.values():
+            adjacency = adjacency + matrix
+        return adjacency
+
+    def transitive_closure(self) -> csr_matrix:
+        """Return the reflexive-transitive closure of the adjacency matrix."""
+
+        reachable = eye(len(self.states), format="csr", dtype=bool)
+        for matrix in self.matrices.values():
+            reachable = reachable + matrix
+        while True:
+            expanded = reachable + reachable @ reachable
+            if expanded.nnz == reachable.nnz:
+                return expanded
+            reachable = expanded
+
+    def accepts(self, word: Iterable[Symbol]) -> bool:
+        """Check whether the automaton accepts ``word``.
+
+        The vector of current states is multiplied by the matrix of the next
+        symbol on every step; the word is accepted when the final vector
+        reaches at least one final state.
+        """
+
+        if not self.start_states or not self.final_states:
+            return False
+
+        current = np.zeros(self.states_count, dtype=bool)
+        current[list(self.start_states)] = True
         for symbol in word:
             matrix = self.matrices.get(Symbol(symbol))
             if matrix is None:
                 return False
-            current = {
-                int(target)
-                for source in current
-                for target in matrix.indices[
-                    matrix.indptr[source] : matrix.indptr[source + 1]
-                ]
-            }
-            if not current:
+            current = np.asarray(current @ matrix, dtype=bool)
+            if not current.any():
                 return False
-        return not current.isdisjoint(self.final_states)
+        return bool(current[list(self.final_states)].any())
 
     def is_empty(self) -> bool:
-        """Return whether no final state is reachable from a start state."""
+        """Return whether no final state is reachable from a start state.
 
-        visited = set(self.start_states)
-        queue = deque(visited)
-        while queue:
-            source = queue.popleft()
-            if source in self.final_states:
-                return False
-            for matrix in self.matrices.values():
-                for target in matrix.indices[
-                    matrix.indptr[source] : matrix.indptr[source + 1]
-                ]:
-                    target = int(target)
-                    if target not in visited:
-                        visited.add(target)
-                        queue.append(target)
-        return True
+        Reachability is computed by multiplying the start vector by the
+        transitive closure of the adjacency matrix, so paths of length zero
+        are taken into account as well.
+        """
+
+        if not self.start_states or not self.final_states:
+            return True
+
+        starts = np.zeros(self.states_count, dtype=bool)
+        starts[list(self.start_states)] = True
+        reachable = np.asarray(starts @ self.transitive_closure(), dtype=bool)
+        return not reachable[list(self.final_states)].any()
 
 
 def intersect_automata(
@@ -116,8 +136,9 @@ def intersect_automata(
         state: index for index, state in enumerate(product.index_to_state)
     }
     product.states_count = automaton1.states_count * width
+    # State (first, second) is stored at first * width + second, matching kron.
     product.start_states = {
-        first * width + second  # second < width (width == max(automaton2.states))
+        first * width + second
         for first in automaton1.start_states
         for second in automaton2.start_states
     }
@@ -137,44 +158,27 @@ def intersect_automata(
 def tensor_based_rpq(
     regex: str, graph: MultiDiGraph, start_nodes: set[int], final_nodes: set[int]
 ) -> set[tuple[int, int]]:
-    """Find graph node pairs joined by a path accepted by ``regex``."""
+    """Find graph node pairs joined by a path accepted by ``regex``.
 
-    graph_nodes = set(graph.nodes)
-    starts = (set(start_nodes) if start_nodes else graph_nodes) & graph_nodes
-    finals = (set(final_nodes) if final_nodes else graph_nodes) & graph_nodes
-    if not starts or not finals:
-        return set()
+    The pairs are extracted from the transitive closure of the tensor product
+    of the automata for ``regex`` and ``graph``: every closure row of a
+    product start state gives the reachable product states, and every reached
+    final state produces a pair of graph nodes.
+    """
 
     regex_matrix = AdjacencyMatrixFA(regex_to_dfa(regex))
-    graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, starts, finals))
+    graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
     product = intersect_automata(regex_matrix, graph_matrix)
-    width = graph_matrix.states_count
-
-    neighbors = [set() for _ in range(product.states_count)]
-    for matrix in product.matrices.values():
-        for source in range(product.states_count):
-            neighbors[source].update(
-                int(target)
-                for target in matrix.indices[
-                    matrix.indptr[source] : matrix.indptr[source + 1]
-                ]
-            )
+    closure = product.transitive_closure()
 
     result = set()
-    for start in starts:
-        graph_start = graph_matrix.state_to_index[State(start)]
-        initial = {
-            regex_start * width + graph_start  # graph_start < width
-            for regex_start in regex_matrix.start_states
-        }
-        visited = set(initial)
-        queue = deque(initial)
-        while queue:
-            state = queue.popleft()
-            if state in product.final_states:
-                final = graph_matrix.index_to_state[state % width].value
-                result.add((start, final))
-            for target in neighbors[state] - visited:
-                visited.add(target)
-                queue.append(target)
+    for source in product.start_states:
+        for target in closure.getrow(source).indices:
+            if target in product.final_states:
+                result.add(
+                    (
+                        product.index_to_state[source][1].value,
+                        product.index_to_state[target][1].value,
+                    )
+                )
     return result
