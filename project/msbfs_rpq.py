@@ -1,13 +1,12 @@
 """Multiple-source BFS-based regular path queries."""
 
-import numpy as np
 from networkx import MultiDiGraph
-from scipy.sparse import block_diag
+from scipy.sparse import block_diag, csr_matrix
 
 from project.adjacency_matrix_fa import AdjacencyMatrixFA
 from project.task2 import graph_to_nfa, regex_to_dfa
 
-__all__ = ["ms_bfs_based_rpq"]
+__all__: list[str] = ["ms_bfs_based_rpq"]
 
 
 def ms_bfs_based_rpq(
@@ -19,7 +18,7 @@ def ms_bfs_based_rpq(
     """Return all ``(start, final)`` pairs accepted by ``regex``.
 
     A multiple-source BFS advances all start nodes simultaneously.
-    Every BFS layer is computed with Boolean matrix products:
+    Every BFS layer is computed with sparse Boolean matrix products:
     for a symbol the frontier is shifted along the graph edges with
     that label and, inside each block, advanced by the DFA transition matrix
     of the symbol (enlarged to all blocks at once with ``block_diag``).
@@ -28,19 +27,23 @@ def ms_bfs_based_rpq(
     regex_matrix = AdjacencyMatrixFA(regex_to_dfa(regex))
     graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
 
-    width = regex_matrix.states_count
-    start_indices = sorted(graph_matrix.start_states)
-    blocks = len(start_indices)
+    width: int = regex_matrix.states_count
+    start_indices: list[int] = sorted(graph_matrix.start_states)
+    blocks: int = len(start_indices)
     if not blocks:
         return set()
 
-    shape = (blocks * width, graph_matrix.states_count)
-
-    # Frontier and visited states: one row block per start node.
-    front = np.zeros(shape, dtype=bool)
+    row_indices: list[int] = []
+    column_indices: list[int] = []
     for block, start in enumerate(start_indices):
         for dfa_start in regex_matrix.start_states:
-            front[block * width + dfa_start, start] = True
+            row_indices.append(block * width + dfa_start)
+            column_indices.append(start)
+    front = csr_matrix(
+        ([True] * len(row_indices), (row_indices, column_indices)),
+        shape=(blocks * width, graph_matrix.states_count),
+        dtype=bool,
+    )
     visited = front.copy()
 
     dfa_steps = {
@@ -49,27 +52,41 @@ def ms_bfs_based_rpq(
         if symbol in graph_matrix.matrices
     }
 
-    while front.any():
-        new_front = np.zeros(shape, dtype=bool)
+    while front.nnz:
+        new_front = None
         for symbol, dfa_step in dfa_steps.items():
             # Shift along the graph edges, then advance the DFA in each block.
             moved = dfa_step @ (front @ graph_matrix.matrices[symbol])
-            new_front |= np.asarray(moved, dtype=bool)
-        front = new_front & ~visited
-        visited |= new_front
+            new_front = moved if new_front is None else new_front + moved
+        if new_front is None:
+            break
+        new_front = new_front.tocsr()
+        # Keep only the states that have not been reached before.
+        front = new_front - new_front.multiply(visited)
+        front.eliminate_zeros()
+        visited = visited + new_front
 
-    dfa_finals = list(regex_matrix.final_states)
+    if not regex_matrix.final_states:
+        return set()
+
+    selector_rows: list[int] = []
+    selector_columns: list[int] = []
+    for block in range(blocks):
+        for dfa_final in regex_matrix.final_states:
+            selector_rows.append(block)
+            selector_columns.append(block * width + dfa_final)
+    selector = csr_matrix(
+        ([True] * len(selector_rows), (selector_rows, selector_columns)),
+        shape=(blocks, blocks * width),
+        dtype=bool,
+    )
+    reached = selector @ visited
+
     result: set[tuple[int, int]] = set()
     for block, start in enumerate(start_indices):
-        block_rows = visited[block * width : (block + 1) * width, :]
-        reached = np.any(block_rows[dfa_finals, :], axis=0)
-        for final in graph_matrix.final_states:
-            if reached[final]:
-                result.add(
-                    (
-                        graph_matrix.index_to_state[start].value,
-                        graph_matrix.index_to_state[final].value,
-                    )
-                )
+        start_value = graph_matrix.index_to_state[start].value
+        for node in reached.getrow(block).indices:
+            if node in graph_matrix.final_states:
+                result.add((start_value, graph_matrix.index_to_state[node].value))
 
     return result
