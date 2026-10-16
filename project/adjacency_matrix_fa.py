@@ -3,7 +3,6 @@
 from collections import defaultdict
 from collections.abc import Iterable
 
-import numpy as np
 from networkx import MultiDiGraph
 from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, Symbol
 from scipy.sparse import csr_matrix, eye, kron
@@ -92,16 +91,24 @@ class AdjacencyMatrixFA:
         if not self.start_states or not self.final_states:
             return False
 
-        current = np.zeros(self.states_count, dtype=bool)
-        current[list(self.start_states)] = True
+        start_states = list(self.start_states)
+        current = csr_matrix(
+            (
+                [True] * len(start_states),
+                ([0] * len(start_states), start_states),
+            ),
+            shape=(1, self.states_count),
+            dtype=bool,
+        )
+
         for symbol in word:
             matrix = self.matrices.get(Symbol(symbol))
             if matrix is None:
                 return False
-            current = np.asarray(current @ matrix, dtype=bool)
-            if not current.any():
+            current = current @ matrix
+            if current.nnz == 0:
                 return False
-        return bool(current[list(self.final_states)].any())
+        return any(node in self.final_states for node in current.indices)
 
     def is_empty(self) -> bool:
         """Return whether no final state is reachable from a start state.
@@ -114,10 +121,17 @@ class AdjacencyMatrixFA:
         if not self.start_states or not self.final_states:
             return True
 
-        starts = np.zeros(self.states_count, dtype=bool)
-        starts[list(self.start_states)] = True
-        reachable = np.asarray(starts @ self.transitive_closure(), dtype=bool)
-        return not reachable[list(self.final_states)].any()
+        start_states = list(self.start_states)
+        starts = csr_matrix(
+            (
+                [True] * len(start_states),
+                ([0] * len(start_states), start_states),
+            ),
+            shape=(1, self.states_count),
+            dtype=bool,
+        )
+        reachable = starts @ self.transitive_closure()
+        return not any(node in self.final_states for node in reachable.indices)
 
 
 def intersect_automata(
