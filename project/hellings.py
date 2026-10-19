@@ -25,7 +25,7 @@ def hellings_based_cfpq(
     automaton = graph_to_nfa(graph, start_nodes, final_nodes)
 
     triples = {
-        (state.value, variable, state.value)
+        (state, variable, state)
         for state in automaton.states
         for variable in normalized.get_nullable_symbols()
     }
@@ -36,7 +36,7 @@ def hellings_based_cfpq(
                 and isinstance(production.body[0], Terminal)
                 and production.body[0].value == symbol.value
             ):
-                triples.add((source.value, production.head, target.value))
+                triples.add((source, production.head, target))
 
     while True:
         new_triples = set()
@@ -56,10 +56,10 @@ def hellings_based_cfpq(
             break
         triples.update(new_triples)
 
-    starts = {state.value for state in automaton.start_states}
-    finals = {state.value for state in automaton.final_states}
     return {
-        (source, target)
+        (source.value, target.value)
         for source, variable, target in triples
-        if variable == normalized.start_symbol and source in starts and target in finals
+        if variable == normalized.start_symbol
+        and source in automaton.start_states
+        and target in automaton.final_states
     }
