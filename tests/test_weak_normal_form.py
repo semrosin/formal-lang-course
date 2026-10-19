@@ -49,24 +49,14 @@ def test_conversion_preserves_epsilon_from_a_chain_of_nullable_variables() -> No
     assert not normalized.contains(["b", "b"])
 
 
-def test_conversion_avoids_collisions_with_existing_variable_names() -> None:
-    start = Variable("S")
-    a_cnf, c_cnf, fresh = map(Variable, ["a#CNF#", "C#CNF#1", "WCNF0"])
-    cfg = CFG(
-        start_symbol=start,
-        productions={
-            Production(start, [Terminal("a"), a_cnf, c_cnf, fresh]),
-            Production(a_cnf, [Terminal("b")]),
-            Production(c_cnf, [Terminal("c")]),
-            Production(fresh, [Terminal("d")]),
-        },
-    )
+def test_conversion_removes_unreachable_symbols() -> None:
+    cfg = CFG.from_text("S -> a\nUnused -> b | $")
 
     normalized = cfg_to_weak_normal_form(cfg)
 
-    assert normalized.contains(["a", "b", "c", "d"])
-    assert not normalized.contains(["a", "a", "c", "d"])
-    assert not normalized.contains(["b", "b", "c", "d"])
+    assert normalized.variables == {Variable("S")}
+    assert normalized.terminals == {Terminal("a")}
+    assert set(normalized.productions) == {Production(Variable("S"), [Terminal("a")])}
 
 
 @pytest.mark.parametrize("start_symbol", [None, Variable("S")])

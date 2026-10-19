@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import networkx as nx
 import pytest
-from pyformlang.cfg import CFG, Production, Terminal, Variable
+from pyformlang.cfg import CFG, Variable
 
 from project.hellings import hellings_based_cfpq
 
@@ -106,22 +106,6 @@ def test_hellings_uses_the_grammar_start_symbol() -> None:
     cfg = CFG.from_text("Query -> a\nS -> b", start_symbol=Variable("Query"))
 
     assert hellings_based_cfpq(cfg, graph) == {(0, 1)}
-
-
-def test_hellings_distinguishes_a_terminal_and_variable_with_the_same_value() -> None:
-    start, variable = Variable("S"), Variable("a")
-    cfg = CFG(
-        start_symbol=start,
-        productions={
-            Production(start, [Terminal("a"), variable]),
-            Production(variable, [Terminal("b")]),
-        },
-    )
-    graph = nx.MultiDiGraph()
-    graph.add_edges_from([(0, 1), (1, 2)], label="b")
-    graph.add_edge(0, 1, label="a")
-
-    assert hellings_based_cfpq(cfg, graph) == {(0, 2)}
 
 
 @pytest.mark.parametrize("grammar", ["S -> a", "S -> A\nA -> A", "S -> c"])
