@@ -20,16 +20,9 @@ def matrix_based_cfpq(
 ) -> set[tuple[int, int]]:
     """Return pairs connected by a path in the language of ``cfg``.
 
-    Use Azimov and Grigorev's matrix algorithm (doi:10.1145/3210259.3210264)
-    with one sparse Boolean CSR matrix per nonterminal. For each rule
+    Use algorithm with one sparse Boolean CSR matrix per nonterminal. For each rule
     ``A -> B C``, add ``M_B @ M_C`` to ``M_A`` until no matrix changes.
     Epsilon rules initialize the corresponding matrices' diagonals.
-
-    The grammar is converted to weak Chomsky normal form. Directed graphs
-    and multigraphs with ``label`` edge attributes are supported. As in
-    ``graph_to_nfa``, omitted or empty filters select all graph vertices;
-    explicit vertices absent from the graph are treated as isolated states.
-    Input objects are not modified.
     """
     normalized = cfg_to_weak_normal_form(cfg)
     graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
