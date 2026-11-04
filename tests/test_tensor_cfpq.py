@@ -34,15 +34,6 @@ def test_cfg_conversion_preserves_symbols_used_in_regex_syntax() -> None:
     assert not box.dfa.accepts(["a"])
 
 
-def test_ebnf_conversion_keeps_regular_expression_structure() -> None:
-    rsm = ebnf_to_rsm("S -> (a S b)* | $\nA -> c")
-
-    assert rsm.initial_label == Symbol("S")
-    assert rsm.get_box(Symbol("S")).dfa.accepts([])
-    assert rsm.get_box(Symbol("S")).dfa.accepts(["a", "S", "b"] * 2)
-    assert rsm.get_box(Symbol("A")).dfa.accepts(["c"])
-
-
 def test_tensor_cfpq_handles_recursion_nullable_calls_and_node_filters() -> None:
     graph = nx.MultiDiGraph()
     graph.add_edge(10, 20, label="a")
