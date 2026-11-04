@@ -50,17 +50,8 @@ def ebnf_to_rsm(ebnf: str) -> RecursiveAutomaton:
     return RecursiveAutomaton.from_text(ebnf)
 
 
-def tensor_based_cfpq(
-    rsm: RecursiveAutomaton,
-    graph: DiGraph,
-    start_nodes: set[int] | None = None,
-    final_nodes: set[int] | None = None,
-) -> set[tuple[int, int]]:
-    """Find graph vertex pairs connected by the language of the initial box.
-
-    Repeatedly intersect the RSM with the graph, compute product reachability,
-    and add an edge for each path accepted by a box until no edges are added.
-    """
+def _rsm_to_nfa(rsm: RecursiveAutomaton) -> NondeterministicFiniteAutomaton:
+    """Combine the RSM's boxes into one finite automaton."""
     combined = NondeterministicFiniteAutomaton()
     for label, box in rsm.boxes.items():
         for state in box.dfa.states:
@@ -76,8 +67,21 @@ def tensor_based_cfpq(
             combined.add_transition(
                 State((label, source)), product_symbol, State((label, target))
             )
+    return combined
 
-    machine = AdjacencyMatrixFA(combined)
+
+def tensor_based_cfpq(
+    rsm: RecursiveAutomaton,
+    graph: DiGraph,
+    start_nodes: set[int] | None = None,
+    final_nodes: set[int] | None = None,
+) -> set[tuple[int, int]]:
+    """Find graph vertex pairs connected by the language of the initial box.
+
+    Repeatedly intersect the RSM with the graph, compute product reachability,
+    and add an edge for each path accepted by a box until no edges are added.
+    """
+    machine = AdjacencyMatrixFA(_rsm_to_nfa(rsm))
     graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
     graph_matrix.matrices = {
         Symbol(("terminal", symbol.value)): matrix
