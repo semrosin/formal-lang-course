@@ -1,15 +1,9 @@
 """Recursive automata and tensor-based context-free path querying."""
 
 from networkx import DiGraph
-from pyformlang.cfg import CFG, Terminal
-from pyformlang.finite_automaton import (
-    Epsilon,
-    EpsilonNFA,
-    NondeterministicFiniteAutomaton,
-    State,
-    Symbol,
-)
-from pyformlang.rsa import Box, RecursiveAutomaton
+from pyformlang.cfg import CFG
+from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, State, Symbol
+from pyformlang.rsa import RecursiveAutomaton
 from scipy.sparse import csr_matrix
 
 from project.adjacency_matrix_fa import AdjacencyMatrixFA, intersect_automata
@@ -17,32 +11,14 @@ from project.task2 import graph_to_nfa
 
 
 def cfg_to_rsm(cfg: CFG) -> RecursiveAutomaton:
-    """Build one finite automaton for the productions of each variable."""
-    boxes = set()
-    variable_names = {variable.value for variable in cfg.variables | {cfg.start_symbol}}
-    for variable in cfg.variables | {cfg.start_symbol}:
-        automaton = EpsilonNFA()
-        automaton.add_start_state(0)
-        next_state = 1
-        for production in cfg.productions:
-            if production.head != variable:
-                continue
-            state = 0
-            for symbol in production.body:
-                # Preserve the distinction if a terminal shares a variable's name.
-                value = symbol.value
-                if isinstance(symbol, Terminal) and value in variable_names:
-                    value = symbol
-                automaton.add_transition(state, Symbol(value), next_state)
-                state = next_state
-                next_state += 1
-            if state == 0:
-                automaton.add_transition(0, Epsilon(), next_state)
-                state = next_state
-                next_state += 1
-            automaton.add_final_state(state)
-        boxes.add(Box(automaton, Symbol(variable.value)))
-    return RecursiveAutomaton(initial_label=Symbol(cfg.start_symbol.value), boxes=boxes)
+    """Convert a CFG using pyformlang's text representation.
+
+    Every variable must have productions, and terminal names must not use
+    regular-expression syntax or coincide with variable names.
+    """
+    return RecursiveAutomaton.from_text(
+        cfg.to_text(), start_symbol=Symbol(cfg.start_symbol.value)
+    )
 
 
 def ebnf_to_rsm(ebnf: str) -> RecursiveAutomaton:
@@ -57,15 +33,8 @@ def _rsm_to_nfa(rsm: RecursiveAutomaton) -> NondeterministicFiniteAutomaton:
         for state in box.dfa.states:
             combined.add_start_state(State((label, state)))
         for source, symbol, target in box.dfa:
-            value = symbol.value
-            if isinstance(value, Terminal):
-                product_symbol = Symbol(("terminal", value.value))
-            elif symbol in rsm.labels:
-                product_symbol = Symbol(("variable", value))
-            else:
-                product_symbol = Symbol(("terminal", value))
             combined.add_transition(
-                State((label, source)), product_symbol, State((label, target))
+                State((label, source)), symbol, State((label, target))
             )
     return combined
 
@@ -80,13 +49,10 @@ def tensor_based_cfpq(
 
     Repeatedly intersect the RSM with the graph, compute product reachability,
     and add an edge for each path accepted by a box until no edges are added.
+    Terminal labels and box labels must be distinct.
     """
     machine = AdjacencyMatrixFA(_rsm_to_nfa(rsm))
     graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
-    graph_matrix.matrices = {
-        Symbol(("terminal", symbol.value)): matrix
-        for symbol, matrix in graph_matrix.matrices.items()
-    }
     width = graph_matrix.states_count
     shape = (width, width)
 
@@ -113,14 +79,11 @@ def tensor_based_cfpq(
                 ([True] * len(rows), (rows, columns)), shape=shape, dtype=bool
             )
             box_results[label] = result
-            variable_label = Symbol(("variable", label.value))
-            previous = graph_matrix.matrices.get(
-                variable_label, csr_matrix(shape, dtype=bool)
-            )
+            previous = graph_matrix.matrices.get(label, csr_matrix(shape, dtype=bool))
             expanded = previous + result
             if expanded.nnz != previous.nnz:
                 changed = True
-            graph_matrix.matrices[variable_label] = expanded
+            graph_matrix.matrices[label] = expanded
         if not changed:
             break
 

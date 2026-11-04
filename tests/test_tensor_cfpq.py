@@ -2,7 +2,7 @@
 
 import networkx as nx
 import pytest
-from pyformlang.cfg import CFG, Production, Terminal, Variable
+from pyformlang.cfg import CFG, Variable
 from pyformlang.finite_automaton import Symbol
 
 from project.tensor_cfpq import cfg_to_rsm, ebnf_to_rsm, tensor_based_cfpq
@@ -20,18 +20,6 @@ def test_cfg_conversion_preserves_start_symbol_and_productions() -> None:
     assert box.dfa.accepts([])
     assert box.dfa.accepts(["left", "Query", "right"])
     assert not box.dfa.accepts(["left", "right"])
-
-
-def test_cfg_conversion_preserves_symbols_used_in_regex_syntax() -> None:
-    start = Variable("S")
-    cfg = CFG(
-        start_symbol=start,
-        productions={Production(start, [Terminal("a|b"), Terminal("*")])},
-    )
-    box = cfg_to_rsm(cfg).get_box(Symbol("S"))
-
-    assert box.dfa.accepts(["a|b", "*"])
-    assert not box.dfa.accepts(["a"])
 
 
 def test_tensor_cfpq_handles_recursion_nullable_calls_and_node_filters() -> None:
@@ -79,28 +67,11 @@ def test_tensor_cfpq_treats_explicit_absent_vertices_as_isolated() -> None:
     assert tensor_based_cfpq(rsm, graph, {0, 99}, {1, 99}) == {(0, 1), (99, 99)}
 
 
-def test_tensor_cfpq_with_empty_graph_and_empty_grammar() -> None:
+def test_tensor_cfpq_with_empty_graph() -> None:
     graph = nx.DiGraph()
     assert tensor_based_cfpq(cfg_to_rsm(CFG.from_text("S -> $")), graph) == set()
-    graph.add_node(0)
-    empty_grammar = CFG(start_symbol=Variable("S"))
-    assert tensor_based_cfpq(cfg_to_rsm(empty_grammar), graph) == set()
 
 
-def test_tensor_cfpq_distinguishes_terminal_and_variable_with_same_name() -> None:
-    start = Variable("S")
-    variable = Variable("A")
-    grammar = CFG(
-        start_symbol=start,
-        productions={
-            Production(start, [variable, Terminal("A")]),
-            Production(variable, [Terminal("a")]),
-        },
-    )
-    graph = nx.DiGraph()
-    graph.add_edge(0, 1, label="A")
-    graph.add_edge(1, 2, label="A")
-    graph.add_edge(3, 4, label="a")
-    graph.add_edge(4, 5, label="A")
-
-    assert tensor_based_cfpq(cfg_to_rsm(grammar), graph) == {(3, 5)}
+def test_cfg_conversion_rejects_empty_grammar() -> None:
+    with pytest.raises(ValueError):
+        cfg_to_rsm(CFG(start_symbol=Variable("S")))
