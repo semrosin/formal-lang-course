@@ -11,11 +11,7 @@ from project.task2 import graph_to_nfa
 
 
 def cfg_to_rsm(cfg: CFG) -> RecursiveAutomaton:
-    """Convert a CFG using pyformlang's text representation.
-
-    Every variable must have productions, and terminal names must not use
-    regular-expression syntax or coincide with variable names.
-    """
+    """Convert a CFG using pyformlang's text representation."""
     return RecursiveAutomaton.from_text(
         cfg.to_text(), start_symbol=Symbol(cfg.start_symbol.value)
     )
@@ -49,7 +45,6 @@ def tensor_based_cfpq(
 
     Repeatedly intersect the RSM with the graph, compute product reachability,
     and add an edge for each path accepted by a box until no edges are added.
-    Terminal labels and box labels must be distinct.
     """
     machine = AdjacencyMatrixFA(_rsm_to_nfa(rsm))
     graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
