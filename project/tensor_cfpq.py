@@ -19,9 +19,7 @@ from project.task2 import graph_to_nfa
 def cfg_to_rsm(cfg: CFG) -> RecursiveAutomaton:
     """Build one finite automaton for the productions of each variable."""
     boxes = set()
-    variable_names = {
-        variable.value for variable in cfg.variables | {cfg.start_symbol}
-    }
+    variable_names = {variable.value for variable in cfg.variables | {cfg.start_symbol}}
     for variable in cfg.variables | {cfg.start_symbol}:
         automaton = EpsilonNFA()
         automaton.add_start_state(0)
@@ -78,6 +76,7 @@ def tensor_based_cfpq(
             combined.add_transition(
                 State((label, source)), product_symbol, State((label, target))
             )
+
     machine = AdjacencyMatrixFA(combined)
     graph_matrix = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
     graph_matrix.matrices = {
