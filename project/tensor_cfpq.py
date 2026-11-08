@@ -26,7 +26,7 @@ def _rsm_to_nfa(rsm: RecursiveAutomaton) -> NondeterministicFiniteAutomaton:
     """Combine the RSM's boxes into one finite automaton."""
     combined = NondeterministicFiniteAutomaton()
     for label, box in rsm.boxes.items():
-        for state in box.dfa.states:
+        for state in box.start_state:
             combined.add_start_state(State((label, state)))
         for source, symbol, target in box.dfa:
             combined.add_transition(
@@ -57,22 +57,21 @@ def tensor_based_cfpq(
         changed = False
         box_results = {}
         for label, box in rsm.boxes.items():
-            rows, columns = [], []
+            result = csr_matrix(shape, dtype=bool)
             final_states = {
                 machine.state_to_index[State((label, state))]
                 for state in box.final_states
             }
             for state in box.start_state:
                 machine_start = machine.state_to_index[State((label, state))]
-                for source in range(width):
-                    row = closure.getrow(machine_start * width + source)
-                    for target in row.indices:
-                        if target // width in final_states:
-                            rows.append(source)
-                            columns.append(target % width)
-            result = csr_matrix(
-                ([True] * len(rows), (rows, columns)), shape=shape, dtype=bool
-            )
+                for machine_final in final_states:
+                    result = (
+                        result
+                        + closure[
+                            machine_start * width : (machine_start + 1) * width,
+                            machine_final * width : (machine_final + 1) * width,
+                        ]
+                    )
             box_results[label] = result
             previous = graph_matrix.matrices.get(label, csr_matrix(shape, dtype=bool))
             expanded = previous + result
