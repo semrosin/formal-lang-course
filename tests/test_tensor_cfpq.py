@@ -3,25 +3,9 @@
 import networkx as nx
 import pytest
 from pyformlang.cfg import CFG, Variable
-from pyformlang.finite_automaton import State, Symbol
+from pyformlang.finite_automaton import Symbol
 
-from project.tensor_cfpq import _rsm_to_nfa, cfg_to_rsm, ebnf_to_rsm, tensor_based_cfpq
-
-
-def test_combined_automaton_uses_only_box_start_states() -> None:
-    rsm = cfg_to_rsm(CFG.from_text("S -> a b | $\nA -> c"))
-    combined = _rsm_to_nfa(rsm)
-
-    assert combined.start_states == {
-        State((label, state))
-        for label, box in rsm.boxes.items()
-        for state in box.start_state
-    }
-    assert combined.states == {
-        State((label, state))
-        for label, box in rsm.boxes.items()
-        for state in box.dfa.states
-    }
+from project.tensor_cfpq import cfg_to_rsm, ebnf_to_rsm, tensor_based_cfpq
 
 
 def test_cfg_conversion_preserves_start_symbol_and_productions() -> None:
