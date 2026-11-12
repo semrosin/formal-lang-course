@@ -13,7 +13,9 @@ def test_default_filters_include_all_vertices(nodes):
 
     graph = nx.DiGraph()
     graph.add_edge(0, 1, label="a")
-    assert gll_based_cfpq(cfg_to_rsm(CFG.from_text("S -> a")), graph, nodes, nodes) == {(0, 1)}
+    assert gll_based_cfpq(cfg_to_rsm(CFG.from_text("S -> a")), graph, nodes, nodes) == {
+        (0, 1)
+    }
 
 
 def test_explicit_missing_vertices_are_isolated():
